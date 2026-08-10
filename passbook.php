@@ -1,44 +1,40 @@
 <?php
-session_start();
-include 'database.php';
+require_once 'helpers.php';
+require_once 'database.php';
 
-// Check if user is logged in
-if (!isset($_SESSION['role'])) {
-    echo "Please log in to view the passbook.";
-    exit();
-}
+start_secure_session();
+require_auth();
 
-// Initialize the account number based on the session or admin input
 $account_no = null;
 $is_admin = $_SESSION['role'] === 'admin';
 
 if ($is_admin && isset($_POST['account_no'])) {
-    $account_no = $_POST['account_no'];
+    $account_no = filter_input(INPUT_POST, 'account_no', FILTER_VALIDATE_INT);
 } elseif (isset($_SESSION['account_no'])) {
-    $account_no = $_SESSION['account_no'];
-} else {
-    echo "Access denied. No account number found.";
-    exit();
+    $account_no = filter_var($_SESSION['account_no'], FILTER_VALIDATE_INT);
 }
 
-// Check if the account number is set correctly
 if (!$account_no) {
-    echo "No account number provided.";
+    echo show_alert('No valid account number was provided.', 'danger');
     exit();
 }
 
-// Fetch the username and wallet balance for the user
 $user_query = "SELECT username, wallet_balance FROM users WHERE account_no = ?";
 $user_stmt = $conn->prepare($user_query);
 $user_stmt->bind_param("i", $account_no);
 $user_stmt->execute();
 $user_result = $user_stmt->get_result();
 $user_data = $user_result->fetch_assoc();
+$user_stmt->close();
 
-$username = $user_data['username'] ?? 'Unknown User';
-$balance = $user_data['wallet_balance'] ?? 0;
+if (!$user_data) {
+    echo show_alert('User not found for the requested account number.', 'warning');
+    exit();
+}
 
-// Fetch user transactions from payments table
+$username = htmlspecialchars($user_data['username']);
+$balance = $user_data['wallet_balance'];
+
 $query = "SELECT * FROM payments WHERE account_no = ? ORDER BY date DESC";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("i", $account_no);

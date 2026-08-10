@@ -1,41 +1,46 @@
 <?php
-session_start();
-include 'database.php'; // Database connection file
+require_once 'helpers.php';
+require_once 'database.php';
 
-$error_message = ''; // Initialize the error message variable
+start_secure_session();
+redirect_if_logged_in();
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $username = $_POST['username'];
-    $password = password_hash($_POST['password'], PASSWORD_BCRYPT);
-    $email = $_POST['email'];
+$error_message = '';
 
-    // Check if an admin already exists
-    $checkAdminQuery = "SELECT * FROM users WHERE role = 'admin'";
-    $adminResult = $conn->query($checkAdminQuery);
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    $username = sanitize_text($_POST['username'] ?? '');
+    $password = $_POST['password'] ?? '';
+    $email = sanitize_email($_POST['email'] ?? '');
 
-    if ($adminResult->num_rows > 0) {
-        // If an admin exists, set the error message
-        $error_message = '<div class="alert alert-warning alert-dismissible fade show mt-3" role="alert">
-                            <strong>Notice:</strong> Admin account already exists.
-                          </div>';
+    if ($username === '' || $password === '' || $email === '') {
+        $error_message = show_alert('Please fill in all required fields.', 'warning');
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $error_message = show_alert('Please enter a valid email address.', 'warning');
     } else {
-        // If no admin exists, proceed with the user registration
-        $stmt = $conn->prepare("INSERT INTO users (username, password, email, role) VALUES (?, ?, ?, 'admin')");
-        $stmt->bind_param("sss", $username, $password, $email);
+        $checkAdminQuery = "SELECT id FROM users WHERE role = 'admin' LIMIT 1";
+        $adminResult = $conn->query($checkAdminQuery);
 
-        if ($stmt->execute()) {
-            echo "Registration successful!";
-            header("Location: index.php"); // Redirect after successful registrations
-            exit();
+        if ($adminResult && $adminResult->num_rows > 0) {
+            $error_message = show_alert('An admin account already exists. This registration is only for the first admin.', 'warning');
         } else {
-            echo "<p style='color: red;'>Error: " . $stmt->error . "</p>";
+            $securePassword = password_hash($password, PASSWORD_BCRYPT);
+            $stmt = $conn->prepare("INSERT INTO users (username, password, email, role) VALUES (?, ?, ?, 'admin')");
+            $stmt->bind_param("sss", $username, $securePassword, $email);
+
+            if ($stmt->execute()) {
+                $stmt->close();
+                header("Location: index.php");
+                exit();
+            }
+
+            $error_message = show_alert('Unable to register admin account. Please try again.', 'danger');
+            $stmt->close();
         }
 
-        $stmt->close();
+        if ($adminResult) {
+            $adminResult->free();
+        }
     }
-
-    $adminResult->free();
-    $conn->close();
 }
 ?>
 

@@ -1,63 +1,64 @@
 <?php
-session_start();
-require 'database.php'; // Include your database connection
+require_once 'helpers.php';
+require_once 'database.php';
 
-// Check if the user is logged in as admin
-if (!isset($_SESSION['username']) || $_SESSION['role'] !== 'admin') {
-    header("Location: index.php");
-    exit();
-}
+start_secure_session();
+require_admin();
+
+$message = '';
 
 // Process the payment form submission
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $accountNo = $_POST['account_no'];
-    $amount = $_POST['amount'];
-    $paymentMode = $_POST['payment_mode'];
-    $description = $_POST['description'];
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $accountNo = filter_input(INPUT_POST, 'account_no', FILTER_VALIDATE_INT);
+    $amount = filter_input(INPUT_POST, 'amount', FILTER_VALIDATE_FLOAT);
+    $paymentMode = sanitize_text($_POST['payment_mode'] ?? '');
+    $description = trim($_POST['description'] ?? '');
 
-    // Check if the user exists and retrieve their balance using account_no
-    $userCheck = $conn->prepare("SELECT id, wallet_balance FROM users WHERE account_no = ?");
-    $userCheck->bind_param('i', $accountNo);
-    $userCheck->execute();
-    $userCheck->store_result();
-    $userCheck->bind_result($userId, $walletBalance);
-    
-    if ($userCheck->num_rows > 0) {
-        $userCheck->fetch();
-        
-        // Subtract the amount from wallet balance
-        $newBalance = $walletBalance - $amount;
-        if ($newBalance >= 0) {
-            // Update the wallet balance in the users table
-            $updateWallet = $conn->prepare("UPDATE users SET wallet_balance = ? WHERE account_no = ?");
-            $updateWallet->bind_param('di', $newBalance, $accountNo);
-            $updateWallet->execute();
-
-        // Record the payment in the payments table
-        $insertPayment = $conn->prepare("INSERT INTO payments (user_id, account_no, amount, payment_mode, description) VALUES (?, ?, ?, ?, ?)");
-        $insertPayment->bind_param('iidss', $userId, $accountNo, $amount, $paymentMode, $description);
-        $insertPayment->execute();
-
-        echo '<div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
-                <strong>Success:</strong> Payment processed successfully. New wallet balance is: Rs.'." ". number_format($newBalance, 2) . '
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-              </div>';
-
-
-
+    if ($accountNo === false || $accountNo === null) {
+        $message = show_alert('Please enter a valid account number.', 'warning');
+    } elseif ($amount === false || $amount <= 0) {
+        $message = show_alert('Invalid payment amount. Please enter a positive number.', 'warning');
+    } elseif ($paymentMode === '' || $description === '') {
+        $message = show_alert('Please provide payment mode and description.', 'warning');
     } else {
-        echo '<div class="alert alert-Danger alert-dismissible fade show mt-3" role="alert">
-        Insufficient Balance in this account.
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>';
-        
+        $userCheck = $conn->prepare("SELECT id, wallet_balance FROM users WHERE account_no = ?");
+        $userCheck->bind_param('i', $accountNo);
+        $userCheck->execute();
+        $userCheck->store_result();
+        $userCheck->bind_result($userId, $walletBalance);
+
+        if ($userCheck->num_rows > 0) {
+            $userCheck->fetch();
+            $userCheck->close();
+
+            $newBalance = $walletBalance - $amount;
+            if ($newBalance >= 0) {
+                $conn->begin_transaction();
+
+                $updateWallet = $conn->prepare("UPDATE users SET wallet_balance = ? WHERE account_no = ?");
+                $updateWallet->bind_param('di', $newBalance, $accountNo);
+                $updated = $updateWallet->execute();
+                $updateWallet->close();
+
+                $insertPayment = $conn->prepare("INSERT INTO payments (user_id, account_no, amount, payment_mode, description) VALUES (?, ?, ?, ?, ?)");
+                $insertPayment->bind_param('iidss', $userId, $accountNo, $amount, $paymentMode, $description);
+                $inserted = $insertPayment->execute();
+                $insertPayment->close();
+
+                if ($updated && $inserted) {
+                    $conn->commit();
+                    $message = show_alert('Payment processed successfully. New wallet balance is: Rs. ' . number_format($newBalance, 2), 'success');
+                } else {
+                    $conn->rollback();
+                    $message = show_alert('Payment could not be completed. Please try again.', 'danger');
+                }
+            } else {
+                $message = show_alert('Insufficient balance in this account.', 'danger');
+            }
+        } else {
+            $userCheck->close();
+            $message = show_alert('User not found with this account number.', 'warning');
         }
-
-    } else {
-        echo '<div class="alert alert-Warning alert-dismissible fade show mt-3" role="alert">
-        User not found with this account no.
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>';
     }
 }
 
@@ -93,6 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <body>
 
     <div class="container my-5">
+        <?php if (!empty($message)) echo $message; ?>
         <form method="POST" action="" class="bg-light p-5 rounded shadow-lg" style="max-width: 600px; margin: auto;">
             <h3 class="text-center text-primary mb-4">Payment Form</h3>
             

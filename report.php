@@ -1,11 +1,9 @@
 <?php
-session_start();
-include 'database.php';
+require_once 'helpers.php';
+require_once 'database.php';
 
-if (!isset($_SESSION['username']) || $_SESSION['role'] != 'admin') {
-    header("Location: index.php");
-    exit();
-}
+start_secure_session();
+require_admin();
 
 function getUserReport($conn, $interval) {
     $query = "SELECT COUNT(*) as user_count FROM users WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 1 $interval)";
@@ -17,17 +15,14 @@ function getUserReport($conn, $interval) {
     return $userCount;
 }
 
+$allowed = ['daily' => 'DAY', 'weekly' => 'WEEK', 'monthly' => 'MONTH'];
 $reportType = $_POST['report_type'] ?? 'daily';
+$reportType = array_key_exists($reportType, $allowed) ? $reportType : 'daily';
 $userCount = 0;
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    if ($reportType === 'daily') {
-        $userCount = getUserReport($conn, 'DAY');
-    } elseif ($reportType === 'weekly') {
-        $userCount = getUserReport($conn, 'WEEK');
-    } elseif ($reportType === 'monthly') {
-        $userCount = getUserReport($conn, 'MONTH');
-    }
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $interval = $allowed[$reportType];
+    $userCount = getUserReport($conn, $interval);
 }
 
 $conn->close();

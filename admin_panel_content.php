@@ -1,5 +1,9 @@
 <?php
-include 'database.php';
+require_once 'helpers.php';
+require_once 'database.php';
+
+start_secure_session();
+require_admin();
 
 // Function to credit ₹90 to each user in the chain up to the admin
 function creditIncentiveToChain($userId, $conn) {
@@ -46,14 +50,19 @@ if ($userCount >= 3) {
             </button>
           </div>';
 } else {
-    // Proceed to add the new user if the limit has not been reached
-    $new_account_no = $_POST['new_account_no'];
-    $new_username = $_POST['new_username'];
-    $new_password = password_hash($_POST['new_password'], PASSWORD_BCRYPT);
+    $new_account_no = filter_input(INPUT_POST, 'new_account_no', FILTER_SANITIZE_NUMBER_INT);
+    $new_username = sanitize_text($_POST['new_username'] ?? '');
+    $new_password_raw = $_POST['new_password'] ?? '';
+    $confirm_password = $_POST['retype_password'] ?? '';
 
-    // Insert the new user with the current user as the parent
-    $stmt = $conn->prepare("INSERT INTO users (account_no, username, password, role, parent_id, wallet_balance) VALUES (?, ?, ?, 'member', ?, 0)");
-    $stmt->bind_param("sssi", $new_account_no, $new_username, $new_password, $_SESSION['user_id']);
+    if (!$new_account_no || $new_username === '' || $new_password_raw === '' || $confirm_password === '') {
+        echo show_alert('Please fill in all required member fields.', 'warning');
+    } elseif ($new_password_raw !== $confirm_password) {
+        echo show_alert('Passwords do not match.', 'warning');
+    } else {
+        $new_password = password_hash($new_password_raw, PASSWORD_BCRYPT);
+        $stmt = $conn->prepare("INSERT INTO users (account_no, username, password, role, parent_id, wallet_balance) VALUES (?, ?, ?, 'member', ?, 0)");
+        $stmt->bind_param("sssi", $new_account_no, $new_username, $new_password, $_SESSION['user_id']);
     
     try {
         $stmt->execute();

@@ -1,6 +1,6 @@
 <?php
-// Start the session
-session_start();
+require_once 'helpers.php';
+start_secure_session();
 
 // Clear all session variables
 $_SESSION = [];
@@ -17,8 +17,7 @@ if (ini_get("session.use_cookies")) {
 // Finally, destroy the session
 session_destroy();
 
-// Optionally, redirect to a login or home page after session destruction
-header("Location: index.php"); // Change to your desired page
+// Redirect to the login page after session destruction
+header("Location: index.php");
 exit();
-?>
-?>
+

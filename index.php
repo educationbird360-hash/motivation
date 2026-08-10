@@ -1,84 +1,54 @@
 <?php
-session_start();
+require_once 'helpers.php';
+require_once 'database.php';
 
-// Redirect user if already logged in
-if (isset($_SESSION['role'])) {
-    if ($_SESSION['role'] === 'admin') {
-        header("Location: admin_dashboard.php");
-        exit();
-    } elseif ($_SESSION['role'] === 'member') {
-        header("Location: member_dashboard.php");
-        exit();
-    }
-}
-
-// Include database connection
-include 'database.php'; 
+start_secure_session();
+redirect_if_logged_in();
 
 // Initialize an error message variable
 $error_message = '';
 
-// Fetch the admin's password from the database
-$admin_password = '';
-$admin_stmt = $conn->prepare("SELECT password FROM users WHERE role = 'admin' LIMIT 1");
-$admin_stmt->execute();
-$admin_result = $admin_stmt->get_result();
-if ($admin_row = $admin_result->fetch_assoc()) {
-    $admin_password = $admin_row['password']; // Store admin password as universal password
-}
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $identifier = trim($_POST['identifier'] ?? '');
+    $password = $_POST['password'] ?? '';
 
-
-
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $identifier = $_POST['identifier']; // This can be username or account_no
-    $password = $_POST['password'];
-
-    // Check if identifier is numeric (account_no) or not (username)
-    $identifier = trim($_POST['identifier']);
-    $password = $_POST['password'];
-
-    if (is_numeric($identifier)) {
-        // Sanitize account number input
-        $identifier = filter_var($identifier, FILTER_SANITIZE_NUMBER_INT);
-        $stmt = $conn->prepare("SELECT * FROM users WHERE account_no = ?");
-        $stmt->bind_param("i", $identifier); // "i" for integer binding
+    if ($identifier === '' || $password === '') {
+        $error_message = 'Please enter both username/account number and password.';
     } else {
-        // Sanitize username input
-        $identifier = filter_var($identifier, FILTER_SANITIZE_STRING);
-        $stmt = $conn->prepare("SELECT * FROM users WHERE username = ?");
-        $stmt->bind_param("s", $identifier); // "s" for string binding
-    }
-
-    
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $user = $result->fetch_assoc();
-
-    // Check if user exists
-    if ($user) {
-        // Check if entered password matches the user's password or the admin's password as the universal password
-        if (password_verify($password, $user['password']) || password_verify($password, $admin_password)) {
-            // Store user information in the session
-            $_SESSION['username'] = $user['username'];
-            $_SESSION['role'] = $user['role'];
-            $_SESSION['user_id'] = $user['id'];
-            $_SESSION['account_no'] = $user['account_no']; // Store account number in session
-
-            // Check if universal password was used and set a flag
-            $_SESSION['used_universal_password'] = password_verify($password, $admin_password);
-
-            // Redirect based on role or universal password usage
-            if ($user['role'] == 'admin') {
-                header("Location: admin_dashboard.php");
-            } else {
-                header("Location: member_dashboard.php"); // Redirect to member panel
-            }
-            exit();
+        if (is_numeric($identifier)) {
+            $identifier = filter_var($identifier, FILTER_SANITIZE_NUMBER_INT);
+            $stmt = $conn->prepare("SELECT * FROM users WHERE account_no = ?");
+            $stmt->bind_param("i", $identifier);
         } else {
-            $error_message = 'Invalid login credentials'; // Incorrect password
+            $identifier = sanitize_text($identifier);
+            $stmt = $conn->prepare("SELECT * FROM users WHERE username = ?");
+            $stmt->bind_param("s", $identifier);
         }
-    } else {
-        $error_message = 'User  Not Found'; // User not found
+
+        if ($stmt && $stmt->execute()) {
+            $result = $stmt->get_result();
+            $user = $result->fetch_assoc();
+            $stmt->close();
+
+            if ($user && password_verify($password, $user['password'])) {
+                session_regenerate_id(true);
+                $_SESSION['username'] = $user['username'];
+                $_SESSION['role'] = $user['role'];
+                $_SESSION['user_id'] = $user['id'];
+                $_SESSION['account_no'] = $user['account_no'];
+
+                if ($user['role'] === 'admin') {
+                    header("Location: admin_dashboard.php");
+                } else {
+                    header("Location: member_dashboard.php");
+                }
+                exit();
+            }
+
+            $error_message = 'Invalid login credentials.';
+        } else {
+            $error_message = 'Unable to process login. Please try again.';
+        }
     }
 }
 ?>

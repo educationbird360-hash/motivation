@@ -1,0 +1,19 @@
+# Ignore PHP session and OS files
+*.log
+*.tmp
+*.cache
+.DS_Store
+Thumbs.db
+
+# Ignore IDE files
+.vscode/
+.idea/
+
+# Ignore database files
+*.sql
+*.sql.gz
+*.sqlite
+*.db
+
+# Ignore runtime files
+uploads/

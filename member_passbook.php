@@ -1,35 +1,30 @@
 <?php
-session_start();
-include 'database.php';
+require_once 'helpers.php';
+require_once 'database.php';
 
-// Check if user is logged in and has the correct role
-if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'member') {
-    echo "Access denied. Only logged-in members can view this page.";
+start_secure_session();
+require_member();
+
+$account_no = filter_var($_SESSION['account_no'], FILTER_VALIDATE_INT);
+
+if (!$account_no) {
+    echo show_alert('Invalid account number in session.', 'danger');
     exit();
 }
 
-// Check if account_no is set in session
-if (!isset($_SESSION['account_no'])) {
-    echo "Access denied. You are not logged in.";
-    exit();
-}
-
-$account_no = $_SESSION['account_no'];
-
-// Fetch user transactions from payments table
 $query = "SELECT * FROM payments WHERE account_no = ? ORDER BY date DESC";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("i", $account_no);
 $stmt->execute();
 $result = $stmt->get_result();
 
-// Fetch wallet balance for the user
 $balance_query = "SELECT wallet_balance FROM users WHERE account_no = ?";
 $balance_stmt = $conn->prepare($balance_query);
 $balance_stmt->bind_param("i", $account_no);
 $balance_stmt->execute();
 $balance_result = $balance_stmt->get_result();
-$balance = $balance_result->fetch_assoc()['wallet_balance'];
+$balance_data = $balance_result->fetch_assoc();
+$balance = $balance_data['wallet_balance'] ?? 0;
 ?>
 
 <!DOCTYPE html>
