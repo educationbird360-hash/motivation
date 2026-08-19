@@ -14,146 +14,53 @@ if (!isset($_SESSION['username']) || $_SESSION['role'] !== 'member') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Member Dashboard</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        /* Global Styles */
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f4f4f4;
-        }
-
-        .dashboard-container {
-            display: flex;
-        }
-
-        /* Sidebar Styles */
-        .sidebar {
-            width: 200px;
-            background-color: teal;
-            color: white;
-            padding: 20px;
-            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
-            position: fixed;
-            height: 100%;
-            top: 0;
-            left: 0;
-            z-index: 1000;
-            overflow-y: auto;
-            transition: transform 0.3s ease;
-        }
-
-        .sidebar h2 {
-            margin-top: 0;
-            font-size: 24px;
-            color: #ffffff;
-            text-align: left;
-        }
-
-        .sidebar ul {
-            list-style-type: none;
-            padding: 0;
-        }
-
-        .sidebar ul li {
-            margin: 15px 0;
-        }
-
-        .sidebar ul li a {
-            color: white;
-            text-decoration: none;
-            font-weight: bold;
-            display: flex;
-            align-items: center;
-            padding: 10px;
-            border-radius: 4px;
-            transition: background 0.3s;
-        }
-
-        .sidebar ul li a:hover {
-            background-color: #FFFFFF;
-            color: #2c3e50;
-        }
-
-        .sidebar ul li a i {
-            margin-right: 10px;
-        }
-
-        /* Main Content Styles */
-        .main-content {
-            flex: 1;
-            padding: 20px;
-            margin-left: 250px;
-            transition: margin-left 0.3s ease;
-        }
-
-        .content {
-            background-color: white;
-            padding: 20px;
-            border-radius: 5px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-        }
-
-        /* Toggle Button */
-        .toggle-button {
-            display: none;
-            background-color: #2c3e50;
-            color: white;
-            border: none;
-            font-size: 18px;
-            padding: 10px 15px;
-            cursor: pointer;
-            position: fixed;
-            top: 10px;
-            right: 10px; /* Move to the right side of the page */
-            z-index: 1001;
-            border-radius: 5px;
-        }
-
-        /* Sidebar hidden on small screens */
-        @media (max-width: 768px) {
-            .sidebar {
-                transform: translateX(-100%); /* Hide sidebar by default on small screens */
-            }
-
-            .sidebar.active {
-                transform: translateX(0); /* Show sidebar when active */
-            }
-
-            .main-content {
-                margin-left: 0;
-            }
-
-            .toggle-button {
-                display: block;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="css/dashboard.css">
 </head>
-<body>
-    <!-- Toggle button for small screens -->
-    <button class="toggle-button" onclick="toggleSidebar()">☰</button>
+<body class="dashboard-page">
+    <div class="dashboard-shell">
+        <aside class="dashboard-sidebar" id="dashboardSidebar">
+            <div class="dashboard-brand">
+                <span class="dashboard-brand-mark"><i class="fas fa-compass" aria-hidden="true"></i></span>
+                <span>
+                    <strong>Member Portal</strong>
+                    <small>Account workspace</small>
+                </span>
+            </div>
 
-    <div class="sidebar" id="sidebar">
-        <h2>Member Dashboard</h2>
-        <ul>
-            <li><a href="member_panel.php" target="contentFrame"><i class="fas fa-home"></i> Home</a></li>
-            <li><a href="member_passbook.php" target="contentFrame"><i class="fas fa-book"></i> My Passbook</a></li>
-            <li><a href="help.php" target="contentFrame"><i class="fas fa-question-circle"></i> Help</a></li>
-            <li><a href="logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
-        </ul>
-    </div>
+            <nav class="dashboard-nav" aria-label="Member navigation">
+                <a href="member_panel.php" target="contentFrame"><i class="fas fa-house" aria-hidden="true"></i><span>Overview</span></a>
+                <a href="member_passbook.php" target="contentFrame"><i class="fas fa-book-open" aria-hidden="true"></i><span>My passbook</span></a>
+                <a href="help.php" target="contentFrame"><i class="fas fa-circle-question" aria-hidden="true"></i><span>Help & support</span></a>
+                <a class="dashboard-nav-logout" href="logout.php"><i class="fas fa-arrow-right-from-bracket" aria-hidden="true"></i><span>Sign out</span></a>
+            </nav>
 
-    <div class="main-content">
-        <!-- Content iframe for loading dynamic content -->
-        <iframe src="member_panel.php" name="contentFrame" style="width: 100%; height: 90vh; border: none;"></iframe>
+            <p class="dashboard-sidebar-footer">Your account information is available only inside this authenticated member portal.</p>
+        </aside>
+
+        <main class="dashboard-main">
+            <header class="dashboard-topbar">
+                <div>
+                    <p class="dashboard-kicker">Private member access</p>
+                    <h1>Welcome back, <?php echo htmlspecialchars($_SESSION['username']); ?></h1>
+                </div>
+                <div class="dashboard-user"><i class="fas fa-user" aria-hidden="true"></i><span>Member account</span></div>
+                <button class="dashboard-menu-toggle" type="button" aria-label="Open navigation" aria-controls="dashboardSidebar" aria-expanded="false" onclick="toggleSidebar(this)">
+                    <i class="fas fa-bars" aria-hidden="true"></i>
+                </button>
+            </header>
+
+            <section class="dashboard-workspace" aria-label="Member workspace">
+                <iframe class="dashboard-frame" src="member_panel.php" name="contentFrame" title="Member workspace"></iframe>
+            </section>
+        </main>
     </div>
 
     <script>
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            sidebar.classList.toggle('active');
+        function toggleSidebar(button) {
+            const sidebar = document.getElementById('dashboardSidebar');
+            const isOpen = sidebar.classList.toggle('is-open');
+            button.setAttribute('aria-expanded', String(isOpen));
         }
     </script>
 </body>
