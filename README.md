@@ -34,12 +34,33 @@ CREATE TABLE `payments` (
   `amount` DECIMAL(12,2) NOT NULL,
   `payment_mode` VARCHAR(50) NOT NULL,
   `description` VARCHAR(255) NOT NULL,
+  `transaction_type` VARCHAR(20) NOT NULL DEFAULT 'debit',
+  `balance_before` DECIMAL(12,2) NOT NULL DEFAULT '0.00',
+  `balance_after` DECIMAL(12,2) NOT NULL DEFAULT '0.00',
+  `processed_by` INT UNSIGNED DEFAULT NULL,
   `date` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_user_id` (`user_id`),
   KEY `idx_account_no` (`account_no`),
+  KEY `idx_processed_by` (`processed_by`),
   CONSTRAINT `fk_payments_user` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE ON UPDATE CASCADE
+  ,CONSTRAINT `fk_payments_processed_by` FOREIGN KEY (`processed_by`) REFERENCES `users`(`id`)
+    ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+```
+
+## Existing database migration
+
+If the `payments` table already exists, run this before deploying the updated payment and passbook files:
+
+```sql
+ALTER TABLE payments
+  ADD COLUMN transaction_type VARCHAR(20) NOT NULL DEFAULT 'debit' AFTER description,
+  ADD COLUMN balance_before DECIMAL(12,2) NOT NULL DEFAULT '0.00' AFTER transaction_type,
+  ADD COLUMN balance_after DECIMAL(12,2) NOT NULL DEFAULT '0.00' AFTER balance_before,
+  ADD COLUMN processed_by INT UNSIGNED DEFAULT NULL AFTER balance_after,
+  ADD KEY idx_processed_by (processed_by),
+  ADD CONSTRAINT fk_payments_processed_by FOREIGN KEY (processed_by) REFERENCES users(id);
 ```
 
 ## Improvements made

@@ -91,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !verify_csrf_token($_POST['csrf_tok
 }
 </style>
 </head>
-<body>
+<body class="portal-page">
 
     <div class="form-container">
     <?php if (!empty($error_message)): ?>
@@ -100,6 +100,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !verify_csrf_token($_POST['csrf_tok
         </div>
     <?php endif; ?>
 
+        <div class="portal-emblem" aria-hidden="true">
+            <span class="portal-emblem-core"></span>
+        </div>
+        <p class="portal-kicker">Secure member access</p>
         <h1 class="portal-title">Member Portal</h1>
         <p class="portal-subtitle">Sign in with the credentials provided by your organization.</p>
         <form action="index.php" method="post">

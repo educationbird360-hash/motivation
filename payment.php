@@ -15,15 +15,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !verify_csrf_token($_POST['csrf_tok
     $amount = filter_input(INPUT_POST, 'amount', FILTER_VALIDATE_FLOAT);
     $paymentMode = sanitize_text($_POST['payment_mode'] ?? '');
     $description = trim($_POST['description'] ?? '');
+    $allowedPaymentModes = ['online', 'cash'];
 
     if ($accountNo === false || $accountNo === null) {
         $message = show_alert('Please enter a valid account number.', 'warning');
     } elseif ($amount === false || $amount <= 0) {
         $message = show_alert('Invalid payment amount. Please enter a positive number.', 'warning');
-    } elseif ($paymentMode === '' || $description === '') {
+    } elseif (!in_array($paymentMode, $allowedPaymentModes, true) || $description === '') {
         $message = show_alert('Please provide payment mode and description.', 'warning');
     } else {
-        $userCheck = $conn->prepare("SELECT id, wallet_balance FROM users WHERE account_no = ?");
+        $conn->begin_transaction();
+
+        $userCheck = $conn->prepare("SELECT id, wallet_balance FROM users WHERE account_no = ? FOR UPDATE");
         $userCheck->bind_param('i', $accountNo);
         $userCheck->execute();
         $userCheck->store_result();
@@ -33,17 +36,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !verify_csrf_token($_POST['csrf_tok
             $userCheck->fetch();
             $userCheck->close();
 
-            $newBalance = $walletBalance - $amount;
+            $balanceBefore = (float) $walletBalance;
+            $newBalance = $balanceBefore - $amount;
             if ($newBalance >= 0) {
-                $conn->begin_transaction();
-
                 $updateWallet = $conn->prepare("UPDATE users SET wallet_balance = ? WHERE account_no = ?");
                 $updateWallet->bind_param('di', $newBalance, $accountNo);
                 $updated = $updateWallet->execute();
                 $updateWallet->close();
 
-                $insertPayment = $conn->prepare("INSERT INTO payments (user_id, account_no, amount, payment_mode, description) VALUES (?, ?, ?, ?, ?)");
-                $insertPayment->bind_param('iidss', $userId, $accountNo, $amount, $paymentMode, $description);
+                $transactionType = 'debit';
+                $processedBy = $_SESSION['user_id'];
+                $insertPayment = $conn->prepare("INSERT INTO payments (user_id, account_no, amount, payment_mode, description, transaction_type, balance_before, balance_after, processed_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $insertPayment->bind_param('iidsssddi', $userId, $accountNo, $amount, $paymentMode, $description, $transactionType, $balanceBefore, $newBalance, $processedBy);
                 $inserted = $insertPayment->execute();
                 $insertPayment->close();
 
@@ -55,10 +59,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !verify_csrf_token($_POST['csrf_tok
                     $message = show_alert('Payment could not be completed. Please try again.', 'danger');
                 }
             } else {
+                $conn->rollback();
                 $message = show_alert('Insufficient balance in this account.', 'danger');
             }
         } else {
             $userCheck->close();
+            $conn->rollback();
             $message = show_alert('User not found with this account number.', 'warning');
         }
     }

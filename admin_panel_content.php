@@ -107,18 +107,27 @@ $stmt_balance->fetch();
 $stmt_balance->close();
 
 // Function to display the user tree recursively and count users in the chain
-function displayUserTree($parentId, $conn, &$count = 0) {
+function displayUserTree($parentId, $conn, &$count = 0, $parentName = '') {
     $stmt = $conn->prepare("SELECT * FROM users WHERE parent_id = ?");
     $stmt->bind_param("i", $parentId);
     $stmt->execute();
     $result = $stmt->get_result();
 
     if ($result->num_rows > 0) {
-        echo "<ol>";
+        echo "<ol class=\"tree-branch\">";
         while ($row = $result->fetch_assoc()) {
             $count++; // Increment count for each user found
-            echo "<li>" . htmlspecialchars($row['username']) . " (Account no: " . htmlspecialchars($row['account_no']) . ", Wallet: ₹" . htmlspecialchars($row['wallet_balance']) . ")";
-            displayUserTree($row['id'], $conn, $count); // Recursive call to display sub-users
+            echo "<li class=\"tree-node\">
+                    <article class=\"tree-card\">
+                        <span class=\"tree-avatar\"><i class=\"fa fa-user\" aria-hidden=\"true\"></i></span>
+                        <span class=\"tree-card-content\">
+                            <strong>" . htmlspecialchars($row['username']) . "</strong>
+                            <span class=\"tree-parent-label\">Created by " . htmlspecialchars($parentName) . "</span>
+                            <span>Account " . htmlspecialchars($row['account_no']) . "</span>
+                        </span>
+                        <span class=\"tree-balance\">₹" . number_format((float) $row['wallet_balance'], 2) . "</span>
+                    </article>";
+            displayUserTree($row['id'], $conn, $count, $row['username']); // Recursive call to display sub-users
             echo "</li>";
         }
         echo "</ol>";
@@ -164,33 +173,119 @@ function displayUserTree($parentId, $conn, &$count = 0) {
             text-shadow: 0 1px 2px rgba(0,0,0,0.2);
         }
 
-        .user-tree {
+        .user-tree,
+        .tree-branch {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .tree-root,
+        .tree-card {
+            position: relative;
             display: flex;
-            flex-direction: column; /* Stack elements vertically */
+            align-items: center;
+            gap: 12px;
+            width: min(100%, 360px);
+            padding: 14px 16px;
+            border: 1px solid #d7e5e5;
+            border-radius: 10px;
+            background: #fff;
+            box-shadow: 0 4px 12px rgba(23, 59, 69, 0.08);
         }
 
-        .user-tree li {
-            flex-direction: column; /* Stack username and sub-tree vertically */
-            padding: 15px 5px;
-            margin-bottom: 10px;
-            background-color: #fff;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            transition: background-color 0.3s ease, transform 0.3s ease;
+        .tree-root {
+            margin: 0 auto 18px;
+            border-color: #337ab7;
+            background: #f0f7fc;
         }
 
-        .user-tree li:hover {
-            background-color: #e9e9e9;
+        .tree-root::after {
+            position: absolute;
+            bottom: -19px;
+            left: 50%;
+            width: 2px;
+            height: 18px;
+            background: #9bc4c4;
+            content: "";
+        }
+
+        .tree-branch {
+            position: relative;
+            display: grid;
+            gap: 14px;
+            margin-left: 24px;
+            padding: 10px 0 0 28px;
+            border-left: 2px solid #9bc4c4;
+        }
+
+        .tree-node {
+            position: relative;
+            min-width: 0;
+        }
+
+        .tree-node::before {
+            position: absolute;
+            top: 30px;
+            left: -28px;
+            width: 28px;
+            height: 2px;
+            background: #9bc4c4;
+            content: "";
+        }
+
+        .tree-node > .tree-branch {
+            margin-top: 14px;
+        }
+
+        .tree-card:hover {
+            border-color: #337ab7;
             transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            box-shadow: 0 8px 18px rgba(23, 59, 69, 0.12);
         }
 
-        .user-tree ul {
-            margin-left: 0px;
+        .tree-avatar {
+            display: grid;
+            width: 38px;
+            height: 38px;
+            flex: 0 0 38px;
+            place-items: center;
+            border-radius: 50%;
+            background: #dcecf7;
+            color: #337ab7;
         }
 
-        .user-tree ul li {
-            font-style: italic;
+        .tree-card-content {
+            display: grid;
+            min-width: 0;
+            gap: 3px;
+        }
+
+        .tree-card-content strong {
+            overflow: hidden;
+            color: #243746;
+            font-size: 0.95rem;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .tree-card-content span {
+            color: #718087;
+            font-size: 0.76rem;
+        }
+
+        .tree-card-content span.tree-parent-label {
+            color: #337ab7;
+            font-size: 0.72rem;
+            font-weight: 700;
+        }
+
+        .tree-balance {
+            margin-left: auto;
+            color: #19756f;
+            font-size: 0.82rem;
+            font-weight: 700;
+            white-space: nowrap;
         }
 
         .logout-btn {
@@ -214,14 +309,6 @@ function displayUserTree($parentId, $conn, &$count = 0) {
 
         /* Responsive design */
         @media (max-width: 768px) { /* Adjust breakpoint for tablets */
-    .user-tree ul {
-        margin-left: 0px; /* Reduce indentation for smaller screens */
-    }
-    .user-tree li {
-        font-size: 15px; /* Smaller font size */
-        padding: 2px 2px; /* Less padding */
-    }
-
     .container {
             width: 100%;
             max-width: 100%;
@@ -237,12 +324,20 @@ function displayUserTree($parentId, $conn, &$count = 0) {
 }
 
 @media (max-width: 480px) { /* Adjust breakpoint for phones */
-    .user-tree ul {
-        margin-left: 10px; /* Further reduced indentation */
+    .tree-card,
+    .tree-root {
+        width: 100%;
+        padding: 12px;
     }
-    .user-tree li {
-        font-size: 12px; /* Even smaller font */
-        padding: 8px 12px; /* Minimal padding */
+
+    .tree-branch {
+        margin-left: 12px;
+        padding-left: 20px;
+    }
+
+    .tree-node::before {
+        left: -20px;
+        width: 20px;
     }
 }
     </style>
@@ -297,14 +392,23 @@ function displayUserTree($parentId, $conn, &$count = 0) {
 
 
     <div class="container">
-        <ul class="user-tree">
+        <div class="tree-root">
+            <span class="tree-avatar"><i class="fa fa-shield-alt" aria-hidden="true"></i></span>
+            <span class="tree-card-content">
+                <strong><?php echo htmlspecialchars($_SESSION['username']); ?></strong>
+                <span>Root administrator account</span>
+            </span>
+            <span class="tree-balance">₹<?php echo number_format((float) $walletBalance, 2); ?></span>
+        </div>
+
+        <div class="user-tree">
         <?php
             // Initialize user count
             $userCount = 0;
 
             // Display the connected users tree starting from the logged-in user
             if (isset($_SESSION['user_id'])) {
-                displayUserTree($_SESSION['user_id'], $conn, $userCount);
+                displayUserTree($_SESSION['user_id'], $conn, $userCount, $_SESSION['username']);
                 echo "<p>Total Users in Chain: $userCount</p>"; // Display the total user count
             } else {
                 echo "<p>User ID not found in session.</p>";
@@ -312,7 +416,7 @@ function displayUserTree($parentId, $conn, &$count = 0) {
 
             $conn->close();
         ?>
-        </ul>
+        </div>
     </div>
 
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
