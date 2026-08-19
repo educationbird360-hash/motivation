@@ -19,8 +19,11 @@ $allowed = ['daily' => 'DAY', 'weekly' => 'WEEK', 'monthly' => 'MONTH'];
 $reportType = $_POST['report_type'] ?? 'daily';
 $reportType = array_key_exists($reportType, $allowed) ? $reportType : 'daily';
 $userCount = 0;
+$error_message = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !verify_csrf_token($_POST['csrf_token'] ?? '')) {
+    $error_message = show_alert('Your session expired. Please refresh the page and try again.', 'warning');
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $interval = $allowed[$reportType];
     $userCount = getUserReport($conn, $interval);
 }
@@ -37,8 +40,10 @@ $conn->close();
 </head>
 <body>
 <div class="container my-5">
+    <?php if (!empty($error_message)) echo $error_message; ?>
     <h2 class="text-center mb-4">User Registration Report</h2>
     <form method="POST" action="report.php" class="form-inline justify-content-center mb-4">
+        <?php echo csrf_field(); ?>
         <label for="report_type" class="mr-2 font-weight-bold">Select Report Type:</label>
         <select name="report_type" id="report_type" class="form-control mr-2">
             <option value="daily" <?php if ($reportType == 'daily') echo 'selected'; ?>>Daily</option>

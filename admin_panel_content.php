@@ -29,7 +29,7 @@ function creditIncentiveToChain($userId, $conn) {
 }
 
 // Add new user functionality
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_user'])) {
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_user']) && verify_csrf_token($_POST['csrf_token'] ?? '')) {
     // Count the number of users created by the current user
     $stmt = $conn->prepare("SELECT COUNT(*) FROM users WHERE parent_id = ?");
     $stmt->bind_param("i", $_SESSION['user_id']);
@@ -38,62 +38,64 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_user'])) {
     $stmt->fetch();
     $stmt->close();
 
-// Enable exceptions for MySQLi to catch SQL errors as exceptions
-mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+    // Enable exceptions for MySQLi to catch SQL errors as exceptions
+    mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
-// Check if the limit of 3 members is reached
-if ($userCount >= 3) {
-    echo '<div class="alert alert-warning alert-dismissible fade show mt-3" role="alert">
-            <strong>Notice:</strong> You have reached the maximum limit of 3 members.
-            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-            </button>
-          </div>';
-} else {
-    $new_account_no = filter_input(INPUT_POST, 'new_account_no', FILTER_SANITIZE_NUMBER_INT);
-    $new_username = sanitize_text($_POST['new_username'] ?? '');
-    $new_password_raw = $_POST['new_password'] ?? '';
-    $confirm_password = $_POST['retype_password'] ?? '';
-
-    if (!$new_account_no || $new_username === '' || $new_password_raw === '' || $confirm_password === '') {
-        echo show_alert('Please fill in all required member fields.', 'warning');
-    } elseif ($new_password_raw !== $confirm_password) {
-        echo show_alert('Passwords do not match.', 'warning');
+    // Check if the limit of 3 members is reached
+    if ($userCount >= 3) {
+        echo '<div class="alert alert-warning alert-dismissible fade show mt-3" role="alert">
+                <strong>Notice:</strong> You have reached the maximum limit of 3 members.
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+              </div>';
     } else {
-        $new_password = password_hash($new_password_raw, PASSWORD_BCRYPT);
-        $stmt = $conn->prepare("INSERT INTO users (account_no, username, password, role, parent_id, wallet_balance) VALUES (?, ?, ?, 'member', ?, 0)");
-        $stmt->bind_param("sssi", $new_account_no, $new_username, $new_password, $_SESSION['user_id']);
-    
-    try {
-        $stmt->execute();
-        $userAddedId = $stmt->insert_id; // Get the ID of the newly created user
-        $stmt->close();
+        $new_account_no = filter_input(INPUT_POST, 'new_account_no', FILTER_SANITIZE_NUMBER_INT);
+        $new_username = sanitize_text($_POST['new_username'] ?? '');
+        $new_password_raw = $_POST['new_password'] ?? '';
+        $confirm_password = $_POST['retype_password'] ?? '';
 
-        // Credit ₹90 to each user in the chain from the creator up to the root
-        creditIncentiveToChain($_SESSION['user_id'], $conn);
-        echo '<div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
-        Member added successfully!.
-        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-            <span aria-hidden="true">&times;</span>
-        </button>
-      </div>';
-
-        echo "<p></p>";
-    } catch (mysqli_sql_exception $e) {
-        // Check for duplicate entry error (SQL error code 1062)
-        if ($e->getCode() === 1062) {
-            echo '<div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
-                    <strong>Error:</strong> Account number already taken. Please use another account number.
-                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                  </div>';
+        if (!$new_account_no || $new_username === '' || $new_password_raw === '' || $confirm_password === '') {
+            echo show_alert('Please fill in all required member fields.', 'warning');
+        } elseif ($new_password_raw !== $confirm_password) {
+            echo show_alert('Passwords do not match.', 'warning');
         } else {
-            echo "<p>Error: " . $e->getMessage() . "</p>";
+            $new_password = password_hash($new_password_raw, PASSWORD_BCRYPT);
+            $stmt = $conn->prepare("INSERT INTO users (account_no, username, password, role, parent_id, wallet_balance) VALUES (?, ?, ?, 'member', ?, 0)");
+            $stmt->bind_param("sssi", $new_account_no, $new_username, $new_password, $_SESSION['user_id']);
+
+            try {
+                $stmt->execute();
+                $userAddedId = $stmt->insert_id; // Get the ID of the newly created user
+                $stmt->close();
+
+                // Credit ₹90 to each user in the chain from the creator up to the root
+                creditIncentiveToChain($_SESSION['user_id'], $conn);
+                echo '<div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
+                Member added successfully!.
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+              </div>';
+            } catch (mysqli_sql_exception $e) {
+                // Check for duplicate entry error (SQL error code 1062)
+                if ($e->getCode() === 1062) {
+                    echo '<div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+                            <strong>Error:</strong> Account number already taken. Please use another account number.
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                          </div>';
+                } else {
+                    echo "<p>Error: " . $e->getMessage() . "</p>";
+                }
+            }
         }
     }
 }
 
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_user']) && !verify_csrf_token($_POST['csrf_token'] ?? '')) {
+    echo show_alert('Your session expired. Please refresh the page and try again.', 'warning');
 }
 
 // Get wallet balance for the logged-in user
@@ -254,6 +256,7 @@ function displayUserTree($parentId, $conn, &$count = 0) {
 -->
 <div class="container my-5">
     <form method="POST" class="form-row align-items-center bg-light p-4 rounded shadow" action="passbook.php" style="max-width: 100%; margin: auto;">
+            <?php echo csrf_field(); ?>
         <div class="col">
             <input type="number" class="form-control" id="account_no" name="account_no" placeholder="Enter account number to view the passbook of any member !" required>
         </div>
@@ -269,6 +272,7 @@ function displayUserTree($parentId, $conn, &$count = 0) {
 <div class="container my-5">
     <h3 class="text-left mb-4">Add New Member</h3>
     <form method="POST" action="" class="form-row align-items-center bg-light p-4 rounded shadow" onsubmit="return validateForm()">
+            <?php echo csrf_field(); ?>
         <div class="col-md-3 mb-3">
             <label for="new_account_no" class="form-label font-weight-bold">Account No:</label>
             <input type="text" class="form-control" name="new_account_no" id="new_account_no" placeholder="Account No" required pattern="\d+" title="Only numeric values are allowed.">

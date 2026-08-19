@@ -21,6 +21,27 @@ body {
     max-width: 400px;
     transition: box-shadow 0.3s ease-in-out;
 }
+.portal-title {
+    margin: 0 0 8px;
+    color: #243746;
+    font-size: 1.7rem;
+    font-weight: 700;
+    text-align: center;
+}
+.portal-subtitle {
+    margin: 0 0 24px;
+    color: #586b78;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    text-align: center;
+}
+.portal-notice {
+    margin: 20px 0 0;
+    color: #687780;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    text-align: center;
+}
 .form-container:hover {
     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
 }

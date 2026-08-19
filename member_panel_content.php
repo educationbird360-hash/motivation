@@ -6,11 +6,6 @@ require_once 'database.php';
 start_secure_session();
 require_member();
 
-// Enable error reporting for debugging
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-
-
 // Check if user_id is set in session
 if (!isset($_SESSION['user_id'])) {
     echo "User  ID is not set in the session.";
@@ -41,7 +36,7 @@ function creditIncentiveToChain($userId, $conn) {
 }
 
 // Add new user functionality with a limit check
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_user'])) {
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_user']) && verify_csrf_token($_POST['csrf_token'] ?? '')) {
     // Count the number of users created by the current user
     $stmt = $conn->prepare("SELECT COUNT(*) FROM users WHERE parent_id = ?");
     $stmt->bind_param("i", $_SESSION['user_id']);
@@ -104,6 +99,12 @@ if ($userCount >= 3) {
             echo "<p>Error: " . $e->getMessage() . "</p>";
         }
     }
+    }
+
+}
+
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_user']) && !verify_csrf_token($_POST['csrf_token'] ?? '')) {
+    echo show_alert('Your session expired. Please refresh the page and try again.', 'warning');
 }
 
 }
@@ -282,6 +283,7 @@ function displayUserTree($parentId, $conn, &$count = 0) {
 <div class="container my-5">
     <h3 class="text-center mb-4">Add New Member</h3>
     <form method="POST" action="" class="form-row align-items-center bg-light p-4 rounded shadow" onsubmit="return validateForm()">
+                <?php echo csrf_field(); ?>
         <div class="col-md-3 mb-3">
             <label for="new_account_no" class="form-label font-weight-bold">Account No:</label>
             <input type="text" class="form-control" name="new_account_no" id="new_account_no" placeholder="Account No" required pattern="\d+" title="Only numeric values are allowed.">

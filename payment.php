@@ -8,7 +8,9 @@ require_admin();
 $message = '';
 
 // Process the payment form submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !verify_csrf_token($_POST['csrf_token'] ?? '')) {
+    $message = show_alert('Your session expired. Please refresh the page and try again.', 'warning');
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $accountNo = filter_input(INPUT_POST, 'account_no', FILTER_VALIDATE_INT);
     $amount = filter_input(INPUT_POST, 'amount', FILTER_VALIDATE_FLOAT);
     $paymentMode = sanitize_text($_POST['payment_mode'] ?? '');
@@ -96,6 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="container my-5">
         <?php if (!empty($message)) echo $message; ?>
         <form method="POST" action="" class="bg-light p-5 rounded shadow-lg" style="max-width: 600px; margin: auto;">
+            <?php echo csrf_field(); ?>
             <h3 class="text-center text-primary mb-4">Payment Form</h3>
             
             <div class="mb-3">

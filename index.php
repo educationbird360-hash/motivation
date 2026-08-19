@@ -8,7 +8,9 @@ redirect_if_logged_in();
 // Initialize an error message variable
 $error_message = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !verify_csrf_token($_POST['csrf_token'] ?? '')) {
+    $error_message = 'Your session expired. Please refresh the page and try again.';
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $identifier = trim($_POST['identifier'] ?? '');
     $password = $_POST['password'] ?? '';
 
@@ -54,9 +56,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ?>
 
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Login</title>
+    <title>Member Portal Sign In</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
@@ -98,13 +100,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
     <?php endif; ?>
 
-    <div class="text-center mb-4">
-    <!-- Logo Image -->
-    <img src="assets/img/logo.webp" alt="Logo" class="img-fluid" style="max-width: 150px;">
-    </div>
-
-        <h4 class="text-left mb-4">Login</h4>
+        <h1 class="portal-title">Member Portal</h1>
+        <p class="portal-subtitle">Sign in with the credentials provided by your organization.</p>
         <form action="index.php" method="post">
+            <?php echo csrf_field(); ?>
             <div class="mb-3">
                 <label for="identifier" class="form-label">Username or Account No</label>
                 <input type="text" class="form-control" id="identifier" name="identifier" required>
@@ -115,6 +114,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
             <button type="submit" class="btn btn-custom">Login</button>
         </form>
+
+        <p class="portal-notice">This is a private account portal. For account support, contact the organization that issued your account.</p>
 
     </div>
 

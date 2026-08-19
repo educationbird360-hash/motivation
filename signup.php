@@ -6,8 +6,15 @@ start_secure_session();
 redirect_if_logged_in();
 
 $error_message = '';
+$adminResult = $conn->query("SELECT id FROM users WHERE role = 'admin' LIMIT 1");
+$adminExists = $adminResult && $adminResult->num_rows > 0;
+if ($adminResult) {
+    $adminResult->free();
+}
 
-if ($_SERVER["REQUEST_METHOD"] === "POST") {
+if ($_SERVER["REQUEST_METHOD"] === "POST" && !verify_csrf_token($_POST['csrf_token'] ?? '')) {
+    $error_message = show_alert('Your session expired. Please refresh the page and try again.', 'warning');
+} elseif ($_SERVER["REQUEST_METHOD"] === "POST") {
     $username = sanitize_text($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
     $email = sanitize_email($_POST['email'] ?? '');
@@ -17,15 +24,22 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error_message = show_alert('Please enter a valid email address.', 'warning');
     } else {
-        $checkAdminQuery = "SELECT id FROM users WHERE role = 'admin' LIMIT 1";
-        $adminResult = $conn->query($checkAdminQuery);
-
-        if ($adminResult && $adminResult->num_rows > 0) {
+        if ($adminExists) {
             $error_message = show_alert('An admin account already exists. This registration is only for the first admin.', 'warning');
         } else {
+            do {
+                $accountNo = random_int(10000000, 99999999);
+                $accountCheck = $conn->prepare("SELECT id FROM users WHERE account_no = ? LIMIT 1");
+                $accountCheck->bind_param("i", $accountNo);
+                $accountCheck->execute();
+                $accountCheck->store_result();
+                $accountExists = $accountCheck->num_rows > 0;
+                $accountCheck->close();
+            } while ($accountExists);
+
             $securePassword = password_hash($password, PASSWORD_BCRYPT);
-            $stmt = $conn->prepare("INSERT INTO users (username, password, email, role) VALUES (?, ?, ?, 'admin')");
-            $stmt->bind_param("sss", $username, $securePassword, $email);
+            $stmt = $conn->prepare("INSERT INTO users (account_no, username, password, email, role) VALUES (?, ?, ?, ?, 'admin')");
+            $stmt->bind_param("isss", $accountNo, $username, $securePassword, $email);
 
             if ($stmt->execute()) {
                 $stmt->close();
@@ -37,9 +51,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $stmt->close();
         }
 
-        if ($adminResult) {
-            $adminResult->free();
-        }
     }
 }
 ?>
@@ -154,8 +165,12 @@ button:hover {
     <!-- Display error message if there is an admin account already -->
     <?php if (!empty($error_message)) echo $error_message; ?>
 
-    <h1>Create Your Account</h1>
+    <h1><?php echo $adminExists ? 'Admin Setup Complete' : 'Initial Admin Setup'; ?></h1>
+    <?php if ($adminExists): ?>
+        <p>An administrator account already exists. Sign in from the member portal.</p>
+    <?php else: ?>
     <form method="POST" action="">
+        <?php echo csrf_field(); ?>
         <label for="username">Username:</label>
         <input type="text" id="username" name="username" required>
         <label for="password">Password:</label>
@@ -167,6 +182,7 @@ button:hover {
     <p class="login-link">
         Already have an account? <a href="index.php">Login here</a>
     </p>
+    <?php endif; ?>
 </div>
 
 
